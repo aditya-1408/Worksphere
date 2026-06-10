@@ -200,7 +200,7 @@ td {
       rgba(15, 23, 42, 0.28) 44%,
       rgba(244, 247, 246, 0.9) 58%
     ),
-    url("/atomquest_bg_sideloaded.svg") left center / cover no-repeat,
+    url("/worksphere_bg_sideloaded.svg") left center / cover no-repeat,
     url("/bg3_emerald_ops.svg") center / cover no-repeat;
   display: grid;
   gap: clamp(1.5rem, 4vw, 4rem);
@@ -746,7 +746,7 @@ td {
         rgba(5, 46, 43, 0.62),
         rgba(244, 247, 246, 0.94) 42%
       ),
-      url("/atomquest_bg_sideloaded.svg") center top / cover no-repeat;
+      url("/worksphere_bg_sideloaded.svg") center top / cover no-repeat;
     grid-template-columns: 1fr;
   }
 

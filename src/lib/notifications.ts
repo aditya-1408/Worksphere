@@ -84,7 +84,7 @@ export async function sendNotification(message: NotificationMessage): Promise<No
                 actions: [
                   {
                     type: "Action.OpenUrl",
-                    title: "Open in AtomQuest",
+                    title: "Open in WorkSphere",
                     url: message.deepLink,
                   },
                 ],

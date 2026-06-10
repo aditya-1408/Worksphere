@@ -1,6 +1,6 @@
-# AtomQuest Goal Setting & Tracking Portal
+# WorkSphere Goal Setting & Tracking Portal
 
-Hackathon submission for AtomQuest Hackathon 1.0: an in-house web portal for employee goal creation, L1 manager approval, quarterly achievement tracking, admin governance, reports, audit logs, and shared departmental KPIs.
+WorkSphere is an in-house web portal for employee goal creation, L1 manager approval, quarterly achievement tracking, admin governance, reports, audit logs, and shared departmental KPIs.
 
 ## Live Demo Readiness
 
@@ -47,7 +47,7 @@ Create accounts from the Sign up tab. Managers and Admin/HR can sign up directly
   - Admin-visible escalation log with owner, level, trigger age, and resolution action.
 - Optional Email and Microsoft Teams notification integration:
   - Resend email helper for submission, approval, return, check-in, phase change, and reminders.
-  - Teams Adaptive Card webhook helper with Open in AtomQuest deep links.
+  - Teams Adaptive Card webhook helper with Open in WorkSphere deep links.
   - Weekly Vercel Cron reminder endpoint for pending quarterly updates and manager check-ins.
 
 ## Tech Stack

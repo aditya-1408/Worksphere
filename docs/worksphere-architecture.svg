@@ -46,7 +46,7 @@
   <circle cx="1620" cy="1040" r="280" fill="#2563eb" opacity="0.13"/>
   <circle cx="1560" cy="150" r="170" fill="#f59e0b" opacity="0.10"/>
 
-  <text x="70" y="72" class="kicker">ATOMQUEST 1.0</text>
+  <text x="70" y="72" class="kicker">WORKSPHERE</text>
   <text x="70" y="126" class="title">Goal Setting &amp; Tracking Portal - Production Architecture</text>
   <text x="70" y="161" class="subtitle">Hosted Next.js portal with real auth, Microsoft Entra SSO, Graph hierarchy sync, Neon persistence, analytics, escalations, CSV export, and notifications.</text>
   <rect x="1395" y="58" width="335" height="82" rx="14" fill="#ffffff" opacity="0.94"/>
@@ -213,5 +213,5 @@
   <text x="1517" y="620" class="pillText">Teams Webhook Ready</text>
   <path d="M1138 548 C1258 560, 1358 586, 1490 612" class="line"/>
 
-  <text x="70" y="1162" class="subtitle">Live: atomquest-portal.vercel.app | Source: github.com/aditya-1408/atomquest-portal | Stack: Next.js + Tailwind + Prisma + Neon + Vercel + Resend + Microsoft Entra ID</text>
+  <text x="70" y="1162" class="subtitle">Live: worksphere-portal.vercel.app | Source: github.com/aditya-1408/worksphere-portal | Stack: Next.js + Tailwind + Prisma + Neon + Vercel + Resend + Microsoft Entra ID</text>
 </svg>

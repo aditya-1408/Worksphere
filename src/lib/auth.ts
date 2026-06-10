@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
-export const sessionCookieName = "atomquest_session";
+export const sessionCookieName = "worksphere_session";
 
 function sessionSecret() {
   const secret = process.env.SESSION_SECRET ?? process.env.NEXTAUTH_SECRET;

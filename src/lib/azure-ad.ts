@@ -156,12 +156,12 @@ export function roleFromAzureGroups(groups: AzureGroup[], existingRole?: DbRole)
   const adminGroups = configuredGroupKeys(
     process.env.AZURE_AD_ADMIN_GROUP,
     process.env.AZURE_AD_ADMIN_GROUP_ID,
-    "AtomQuest-Admins",
+    "WorkSphere-Admins",
   );
   const managerGroups = configuredGroupKeys(
     process.env.AZURE_AD_MANAGER_GROUP,
     process.env.AZURE_AD_MANAGER_GROUP_ID,
-    "AtomQuest-Managers",
+    "WorkSphere-Managers",
   );
   const userGroups = groups.flatMap((group) => [
     normalizedKey(group.id),

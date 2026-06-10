@@ -194,21 +194,21 @@ const seedState = (): AppState => {
     {
       id: "u-admin",
       name: "Ananya HR",
-      email: "admin@atomquest.demo",
+      email: "admin@worksphere.demo",
       role: "Admin",
       department: "People Success",
     },
     {
       id: "u-manager",
       name: "Rohan Mehta",
-      email: "manager@atomquest.demo",
+      email: "manager@worksphere.demo",
       role: "Manager",
       department: "Operations",
     },
     {
       id: "u-employee",
       name: "Priya Shah",
-      email: "employee@atomquest.demo",
+      email: "employee@worksphere.demo",
       role: "Employee",
       department: "Operations",
       managerId: "u-manager",
@@ -216,7 +216,7 @@ const seedState = (): AppState => {
     {
       id: "u-employee-2",
       name: "Karan Iyer",
-      email: "employee2@atomquest.demo",
+      email: "employee2@worksphere.demo",
       role: "Employee",
       department: "Operations",
       managerId: "u-manager",
@@ -703,7 +703,7 @@ export default function Home() {
   const completeLogin = (userId: string) => {
     const user = state.users.find((candidate) => candidate.id === userId);
     if (!user) return;
-    window.sessionStorage.setItem("atomquest-user-id", user.id);
+    window.sessionStorage.setItem("worksphere-user-id", user.id);
     setActiveUserId(user.id);
     setView("Dashboard");
     if (user.role === "Employee") setActiveEmployeeId(user.id);
@@ -1188,7 +1188,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "atomquest-achievement-report.csv";
+    link.download = "worksphere-achievement-report.csv";
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -1224,7 +1224,7 @@ export default function Home() {
       <header className="app-header">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">AtomQuest 1.0</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">WorkSphere</p>
             <h1 className="text-xl font-semibold">Goal Setting & Tracking Portal</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -2693,7 +2693,7 @@ function LoginScreen({
   return (
     <section className="login-shell">
       <div className="login-panel">
-        <p className="eyebrow">AtomQuest 1.0</p>
+        <p className="eyebrow">WorkSphere</p>
         <h1>Goal Setting & Tracking Portal</h1>
         <p className="muted">Create an account or sign in with your existing workplace credentials.</p>
 

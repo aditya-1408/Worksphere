@@ -24,7 +24,7 @@ async function main() {
     data: {
       id: "u-admin",
       name: "Ananya HR",
-      email: "admin@atomquest.demo",
+      email: "admin@worksphere.demo",
       role: "ADMIN",
       department: "People Success",
     },
@@ -34,7 +34,7 @@ async function main() {
     data: {
       id: "u-manager",
       name: "Rohan Mehta",
-      email: "manager@atomquest.demo",
+      email: "manager@worksphere.demo",
       role: "MANAGER",
       department: "Operations",
     },
@@ -44,7 +44,7 @@ async function main() {
     data: {
       id: "u-employee",
       name: "Priya Shah",
-      email: "employee@atomquest.demo",
+      email: "employee@worksphere.demo",
       role: "EMPLOYEE",
       department: "Operations",
       managerId: manager.id,
@@ -55,7 +55,7 @@ async function main() {
     data: {
       id: "u-employee-2",
       name: "Karan Iyer",
-      email: "employee2@atomquest.demo",
+      email: "employee2@worksphere.demo",
       role: "EMPLOYEE",
       department: "Operations",
       managerId: manager.id,
@@ -303,7 +303,7 @@ async function main() {
     ],
   });
 
-  console.log(`Seeded AtomQuest demo data for ${admin.email}, ${manager.email}, ${priya.email}, and ${karan.email}.`);
+  console.log(`Seeded WorkSphere demo data for ${admin.email}, ${manager.email}, ${priya.email}, and ${karan.email}.`);
 }
 
 main()

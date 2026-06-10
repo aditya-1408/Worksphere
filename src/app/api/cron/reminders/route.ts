@@ -135,7 +135,7 @@ function recipientsForLevel(employee: CronUser, manager: CronUser | undefined, a
 function emailTemplate(item: EscalationNotification) {
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
-      <h2 style="margin:0 0 12px">AtomQuest Escalation</h2>
+      <h2 style="margin:0 0 12px">WorkSphere Escalation</h2>
       <h3 style="margin:0 0 12px">${item.type}</h3>
       <p>${item.message}</p>
       <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#f8fafc">
@@ -148,7 +148,7 @@ function emailTemplate(item: EscalationNotification) {
       </div>
       <p style="margin-top:20px">
         <a href="${item.deepLink}" style="background:#2563eb;color:white;padding:10px 14px;border-radius:6px;text-decoration:none;font-weight:700">
-          Open in AtomQuest
+          Open in WorkSphere
         </a>
       </p>
       <p style="font-size:12px;color:#64748b;margin-top:20px">

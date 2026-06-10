@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AtomQuest Goal Portal",
-  description: "In-house goal setting and tracking portal for AtomQuest Hackathon 1.0",
+  title: "WorkSphere Goal Portal",
+  description: "In-house goal setting and tracking portal for WorkSphere",
 };
 
 export default function RootLayout({

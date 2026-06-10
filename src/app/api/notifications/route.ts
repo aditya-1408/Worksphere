@@ -107,17 +107,17 @@ function updatePanel(update?: NotificationRequest["updateSummary"]) {
 function emailTemplate(title: string, message: string, deepLink: string, detailsHtml = "") {
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
-      <h2 style="margin:0 0 12px">AtomQuest Goal Portal</h2>
+      <h2 style="margin:0 0 12px">WorkSphere Goal Portal</h2>
       <h3 style="margin:0 0 12px">${title}</h3>
       <p>${message}</p>
       ${detailsHtml}
       <p style="margin-top:20px">
         <a href="${deepLink}" style="background:#2563eb;color:white;padding:10px 14px;border-radius:6px;text-decoration:none;font-weight:700">
-          Open in AtomQuest
+          Open in WorkSphere
         </a>
       </p>
       <p style="font-size:12px;color:#64748b;margin-top:20px">
-        This notification was generated automatically by the AtomQuest Goal Setting & Tracking Portal.
+        This notification was generated automatically by the WorkSphere Goal Setting & Tracking Portal.
       </p>
     </div>
   `;
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     users.find((user) => user.id === employee?.managerId);
   const admins = users.filter((user) => user.role === "ADMIN");
 
-  let title = "AtomQuest Notification";
+  let title = "WorkSphere Notification";
   let message = "A goal workflow event needs attention.";
   let recipients: string[] = [];
   let deepLink = atomQuestLink("/", { view: "Dashboard" });
