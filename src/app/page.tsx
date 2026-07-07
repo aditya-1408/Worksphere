@@ -3283,6 +3283,25 @@ function MeetingsView({
             </div>
           )}
 
+          {/* Debug: Show video status */}
+          {activeMeeting.status === "LIVE" && isJoined && (
+            <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+              <strong>Video Status:</strong>
+              <div>Meeting LIVE: ✅</div>
+              <div>User Joined: ✅</div>
+              <div>LiveKit Token: {livekitToken ? "✅" : "❌ Missing"}</div>
+              <div>LiveKit URL: {livekitWsUrl ? "✅" : "❌ Missing"}</div>
+              <div>Room Name: {livekitRoomName ? "✅" : "❌ Missing"}</div>
+              <div>Can Show Video: {canShowVideo ? "✅ YES" : "❌ NO"}</div>
+            </div>
+          )}
+
+          {isLoadingVideo && (
+            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              Loading video room...
+            </div>
+          )}
+
           {/* Video Room Section */}
           {canShowVideo && (
             <div className="mb-4">
@@ -3302,12 +3321,6 @@ function MeetingsView({
                   <RoomAudioRenderer />
                 </LiveKitRoom>
               </div>
-            </div>
-          )}
-
-          {isLoadingVideo && (
-            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              Loading video room...
             </div>
           )}
 
