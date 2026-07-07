@@ -16,6 +16,11 @@ import {
   ShieldCheck,
   Trash2,
   Unlock,
+  Video,
+  Calendar,
+  Users,
+  FileText,
+  Clock,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -26,6 +31,8 @@ type GoalStatus = "Draft" | "Submitted" | "Approved" | "Returned";
 type GoalTab = "Current" | "Returned" | "Completed" | "Shared KPI";
 type Quarter = "Q1" | "Q2" | "Q3" | "Q4";
 type ProgressStatus = "Not Started" | "On Track" | "Completed";
+type MeetingStatus = "SCHEDULED" | "LIVE" | "ENDED" | "CANCELLED";
+type ParticipantStatus = "INVITED" | "JOINED" | "LEFT" | "DECLINED";
 
 type User = {
   id: string;
@@ -93,6 +100,52 @@ type AuditLog = {
   before?: string;
   after?: string;
   createdAt: string;
+};
+
+type MeetingParticipant = {
+  userId: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: ParticipantStatus;
+  joinedAt: string | null;
+  leftAt: string | null;
+};
+
+type MeetingDocument = {
+  id: string;
+  title: string;
+  fileUrl: string;
+  status: string;
+  createdAt: string;
+};
+
+type MeetingMessage = {
+  id: string;
+  meetingId: string;
+  senderId: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+};
+
+type Meeting = {
+  id: string;
+  title: string;
+  agenda: string | null;
+  department: string;
+  hostId: string;
+  hostName: string;
+  status: MeetingStatus;
+  scheduledAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  livekitRoomName: string | null;
+  participantCount: number;
+  participants: MeetingParticipant[];
+  documents: MeetingDocument[];
+  summaryStatus: string;
+  transcriptStatus: string;
 };
 
 type Confirmation = {
@@ -612,6 +665,18 @@ export default function Home() {
   const [loginError, setLoginError] = useState(() => initialQueryParam("sso_error") ?? "");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [ssoConfigured, setSsoConfigured] = useState(false);
+  
+  // Meeting state
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
+  const [meetingMessages, setMeetingMessages] = useState<MeetingMessage[]>([]);
+  const [meetingChatInput, setMeetingChatInput] = useState("");
+  const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
+  const [newMeetingTitle, setNewMeetingTitle] = useState("");
+  const [newMeetingAgenda, setNewMeetingAgenda] = useState("");
+  const [newMeetingDate, setNewMeetingDate] = useState("");
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
+  const [meetingError, setMeetingError] = useState("");
 
   const loadDatabaseState = async (userId: string) => {
     const response = await fetch("/api/state", { cache: "no-store" });
@@ -762,12 +827,116 @@ export default function Home() {
     window.location.href = "/api/auth/sso/login";
   };
 
+  // Load meetings from API
+  const loadMeetings = async () => {
+    try {
+      const response = await fetch("/api/meetings", { cache: "no-store" });
+      if (!response.ok) throw new Error("Could not load meetings.");
+      const data = (await response.json()) as { meetings: Meeting[] };
+      setMeetings(data.meetings);
+      setMeetingError("");
+    } catch (error) {
+      setMeetingError(error instanceof Error ? error.message : "Failed to load meetings.");
+    }
+  };
+
+  // Create new meeting
+  const createMeeting = async () => {
+    if (!newMeetingTitle.trim() || !newMeetingDate || selectedParticipantIds.length === 0) {
+      setMeetingError("Please provide title, date, and at least one participant.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newMeetingTitle.trim(),
+          agenda: newMeetingAgenda.trim() || null,
+          scheduledAt: new Date(newMeetingDate).toISOString(),
+          participantIds: selectedParticipantIds,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error ?? "Could not create meeting.");
+      }
+      await loadMeetings();
+      setIsCreatingMeeting(false);
+      setNewMeetingTitle("");
+      setNewMeetingAgenda("");
+      setNewMeetingDate("");
+      setSelectedParticipantIds([]);
+      setMeetingError("");
+    } catch (error) {
+      setMeetingError(error instanceof Error ? error.message : "Failed to create meeting.");
+    }
+  };
+
+  // Meeting status actions
+  const updateMeetingStatus = async (meetingId: string, action: "start" | "join" | "leave" | "end" | "cancel") => {
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!response.ok) throw new Error(`Could not ${action} meeting.`);
+      await loadMeetings();
+      setMeetingError("");
+    } catch (error) {
+      setMeetingError(error instanceof Error ? error.message : `Failed to ${action} meeting.`);
+    }
+  };
+
+  // Send chat message
+  const sendMeetingMessage = async (meetingId: string) => {
+    if (!meetingChatInput.trim()) return;
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: meetingChatInput.trim() }),
+      });
+      if (!response.ok) throw new Error("Could not send message.");
+      const data = (await response.json()) as { message: MeetingMessage };
+      setMeetingMessages((prev) => [...prev, data.message]);
+      setMeetingChatInput("");
+      setMeetingError("");
+    } catch (error) {
+      setMeetingError(error instanceof Error ? error.message : "Failed to send message.");
+    }
+  };
+
+  // Attach document URL
+  const attachDocument = async (meetingId: string, title: string, fileUrl: string) => {
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, fileUrl }),
+      });
+      if (!response.ok) throw new Error("Could not attach document.");
+      await loadMeetings();
+      setMeetingError("");
+    } catch (error) {
+      setMeetingError(error instanceof Error ? error.message : "Failed to attach document.");
+    }
+  };
+
+  // Load meetings when user logs in or view changes to Meetings
+  useEffect(() => {
+    if (activeUser && (view === "Meetings" || view === "Live Meetings")) {
+      loadMeetings();
+    }
+  }, [activeUser, view]);
+
   const nav = useMemo(() => {
     if (!activeUser) return [];
-    if (activeUser.role === "Employee") return ["Dashboard", "Goals", "Quarterly Update"];
+    if (activeUser.role === "Employee") return ["Dashboard", "Goals", "Quarterly Update", "Meetings"];
     if (activeUser.role === "Manager")
-      return ["Dashboard", "Approvals", "Check-ins", "Shared Goals"];
-    return ["Dashboard", "Users & Cycles", "Shared Goals", "Reports", "Audit Trail"];
+      return ["Dashboard", "Approvals", "Check-ins", "Shared Goals", "Meetings"];
+    return ["Dashboard", "Users & Cycles", "Shared Goals", "Reports", "Audit Trail", "Live Meetings"];
   }, [activeUser]);
 
   const setAndAudit = (updater: (current: AppState) => AppState) => {
@@ -1400,6 +1569,46 @@ export default function Home() {
 
           {activeUser.role === "Admin" && view === "Audit Trail" && (
             <AuditTrail logs={state.auditLogs} />
+          )}
+
+          {(activeUser.role === "Employee" || activeUser.role === "Manager") && view === "Meetings" && (
+            <MeetingsView
+              meetings={meetings}
+              activeUser={activeUser}
+              activeMeetingId={activeMeetingId}
+              setActiveMeetingId={setActiveMeetingId}
+              meetingMessages={meetingMessages}
+              meetingChatInput={meetingChatInput}
+              setMeetingChatInput={setMeetingChatInput}
+              isCreatingMeeting={isCreatingMeeting}
+              setIsCreatingMeeting={setIsCreatingMeeting}
+              newMeetingTitle={newMeetingTitle}
+              setNewMeetingTitle={setNewMeetingTitle}
+              newMeetingAgenda={newMeetingAgenda}
+              setNewMeetingAgenda={setNewMeetingAgenda}
+              newMeetingDate={newMeetingDate}
+              setNewMeetingDate={setNewMeetingDate}
+              selectedParticipantIds={selectedParticipantIds}
+              setSelectedParticipantIds={setSelectedParticipantIds}
+              availableParticipants={activeUser.role === "Manager" ? team : []}
+              meetingError={meetingError}
+              createMeeting={createMeeting}
+              updateMeetingStatus={updateMeetingStatus}
+              sendMeetingMessage={sendMeetingMessage}
+              attachDocument={attachDocument}
+              loadMeetings={loadMeetings}
+            />
+          )}
+
+          {activeUser.role === "Admin" && view === "Live Meetings" && (
+            <AdminLiveMeetings
+              meetings={meetings}
+              activeMeetingId={activeMeetingId}
+              setActiveMeetingId={setActiveMeetingId}
+              meetingError={meetingError}
+              updateMeetingStatus={updateMeetingStatus}
+              loadMeetings={loadMeetings}
+            />
           )}
         </section>
       </div>
@@ -2825,5 +3034,738 @@ function ConfirmationDialog({
         </div>
       </section>
     </div>
+  );
+}
+
+function MeetingsView({
+  meetings,
+  activeUser,
+  activeMeetingId,
+  setActiveMeetingId,
+  meetingMessages,
+  meetingChatInput,
+  setMeetingChatInput,
+  isCreatingMeeting,
+  setIsCreatingMeeting,
+  newMeetingTitle,
+  setNewMeetingTitle,
+  newMeetingAgenda,
+  setNewMeetingAgenda,
+  newMeetingDate,
+  setNewMeetingDate,
+  selectedParticipantIds,
+  setSelectedParticipantIds,
+  availableParticipants,
+  meetingError,
+  createMeeting,
+  updateMeetingStatus,
+  sendMeetingMessage,
+  attachDocument,
+  loadMeetings,
+}: {
+  meetings: Meeting[];
+  activeUser: User;
+  activeMeetingId: string | null;
+  setActiveMeetingId: (id: string | null) => void;
+  meetingMessages: MeetingMessage[];
+  meetingChatInput: string;
+  setMeetingChatInput: (value: string) => void;
+  isCreatingMeeting: boolean;
+  setIsCreatingMeeting: (value: boolean) => void;
+  newMeetingTitle: string;
+  setNewMeetingTitle: (value: string) => void;
+  newMeetingAgenda: string;
+  setNewMeetingAgenda: (value: string) => void;
+  newMeetingDate: string;
+  setNewMeetingDate: (value: string) => void;
+  selectedParticipantIds: string[];
+  setSelectedParticipantIds: (ids: string[]) => void;
+  availableParticipants: User[];
+  meetingError: string;
+  createMeeting: () => void;
+  updateMeetingStatus: (meetingId: string, action: "start" | "join" | "leave" | "end" | "cancel") => void;
+  sendMeetingMessage: (meetingId: string) => void;
+  attachDocument: (meetingId: string, title: string, fileUrl: string) => void;
+  loadMeetings: () => void;
+}) {
+  const [docTitle, setDocTitle] = useState("");
+  const [docUrl, setDocUrl] = useState("");
+
+  const activeMeeting = meetings.find((m) => m.id === activeMeetingId);
+  const isHost = activeUser.role === "Manager" && activeMeeting?.hostId === activeUser.id;
+  const userParticipant = activeMeeting?.participants.find((p) => p.userId === activeUser.id);
+
+  if (activeMeetingId && activeMeeting) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <button className="secondary-button" onClick={() => setActiveMeetingId(null)}>
+            ← Back to meetings
+          </button>
+          <div className="flex gap-2">
+            <button
+              className="secondary-button"
+              onClick={loadMeetings}
+              title="Refresh meeting data"
+            >
+              <RotateCcw size={16} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        <Panel title={activeMeeting.title}>
+          <div className="mb-4 grid gap-2 md:grid-cols-3">
+            <div>
+              <p className="text-xs text-slate-500">Status</p>
+              <span className={classNames(
+                "inline-flex rounded-full px-2 py-1 text-xs font-medium",
+                activeMeeting.status === "SCHEDULED" && "bg-blue-50 text-blue-700",
+                activeMeeting.status === "LIVE" && "bg-green-50 text-green-700",
+                activeMeeting.status === "ENDED" && "bg-slate-50 text-slate-700",
+                activeMeeting.status === "CANCELLED" && "bg-red-50 text-red-700"
+              )}>
+                {activeMeeting.status}
+              </span>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Host</p>
+              <p className="text-sm font-medium">{activeMeeting.hostName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Scheduled</p>
+              <p className="text-sm font-medium">
+                {new Date(activeMeeting.scheduledAt).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          {activeMeeting.agenda && (
+            <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold text-slate-500 mb-1">Agenda</p>
+              <p className="text-sm text-slate-700">{activeMeeting.agenda}</p>
+            </div>
+          )}
+
+          <div className="mb-4 flex gap-2">
+            {isHost && activeMeeting.status === "SCHEDULED" && (
+              <button
+                className="primary-button"
+                onClick={() => updateMeetingStatus(activeMeeting.id, "start")}
+              >
+                <Video size={16} /> Start Meeting
+              </button>
+            )}
+            {!isHost && activeMeeting.status === "SCHEDULED" && (
+              <div className="rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+                Meeting is scheduled. Waiting for host to start.
+              </div>
+            )}
+            {activeMeeting.status === "LIVE" && userParticipant?.status !== "JOINED" && (
+              <button
+                className="primary-button"
+                onClick={() => updateMeetingStatus(activeMeeting.id, "join")}
+              >
+                <Video size={16} /> Join Meeting
+              </button>
+            )}
+            {activeMeeting.status === "LIVE" && userParticipant?.status === "JOINED" && (
+              <button
+                className="secondary-button"
+                onClick={() => updateMeetingStatus(activeMeeting.id, "leave")}
+              >
+                Leave Meeting
+              </button>
+            )}
+            {isHost && activeMeeting.status === "LIVE" && (
+              <button
+                className="danger-button"
+                onClick={() => updateMeetingStatus(activeMeeting.id, "end")}
+              >
+                End Meeting
+              </button>
+            )}
+            {activeMeeting.status === "ENDED" && (
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                Meeting ended at {activeMeeting.endedAt ? new Date(activeMeeting.endedAt).toLocaleString() : "unknown"}
+              </div>
+            )}
+          </div>
+
+          {meetingError && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+              {meetingError}
+            </div>
+          )}
+
+          {/* Participants Section */}
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <Users size={16} /> Participants ({activeMeeting.participants.length})
+            </h3>
+            <div className="grid gap-2 md:grid-cols-2">
+              {activeMeeting.participants.map((participant) => (
+                <div
+                  key={participant.userId}
+                  className="flex items-center justify-between rounded-md border border-slate-200 p-2"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{participant.name}</p>
+                    <p className="text-xs text-slate-500">{participant.email}</p>
+                  </div>
+                  <span
+                    className={classNames(
+                      "rounded-full px-2 py-1 text-xs",
+                      participant.status === "INVITED" && "bg-slate-100 text-slate-600",
+                      participant.status === "JOINED" && "bg-green-100 text-green-700",
+                      participant.status === "LEFT" && "bg-slate-100 text-slate-500"
+                    )}
+                  >
+                    {participant.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Documents Section */}
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <FileText size={16} /> Documents ({activeMeeting.documents.length})
+            </h3>
+            {isHost && activeMeeting.status !== "ENDED" && (
+              <div className="mb-2 grid gap-2 md:grid-cols-3">
+                <input
+                  placeholder="Document title"
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                />
+                <input
+                  placeholder="https://docs.example.com/file"
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={docUrl}
+                  onChange={(e) => setDocUrl(e.target.value)}
+                />
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    if (docTitle.trim() && docUrl.trim()) {
+                      attachDocument(activeMeeting.id, docTitle.trim(), docUrl.trim());
+                      setDocTitle("");
+                      setDocUrl("");
+                    }
+                  }}
+                >
+                  <Plus size={16} /> Attach
+                </button>
+              </div>
+            )}
+            <div className="space-y-2">
+              {activeMeeting.documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between rounded-md border border-slate-200 p-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText size={16} className="text-slate-400" />
+                    <div>
+                      <p className="text-sm font-medium">{doc.title}</p>
+                      <p className="text-xs text-slate-500">
+                        {new Date(doc.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Open →
+                  </a>
+                </div>
+              ))}
+              {activeMeeting.documents.length === 0 && (
+                <div className="text-sm text-slate-500">No documents attached yet</div>
+              )}
+            </div>
+          </div>
+
+          {/* Chat Section */}
+          <div>
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <MessageSquare size={16} /> Meeting Chat
+            </h3>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 max-h-64 overflow-y-auto mb-2">
+              {meetingMessages.length === 0 && (
+                <div className="text-sm text-slate-500">No messages yet</div>
+              )}
+              {meetingMessages.map((msg) => (
+                <div key={msg.id} className="mb-2">
+                  <p className="text-xs text-slate-500">
+                    {msg.senderName} • {new Date(msg.createdAt).toLocaleTimeString()}
+                  </p>
+                  <p className="text-sm text-slate-900">{msg.body}</p>
+                </div>
+              ))}
+            </div>
+            {activeMeeting.status !== "ENDED" && activeMeeting.status !== "CANCELLED" && (
+              <div className="flex gap-2">
+                <input
+                  placeholder="Type a message..."
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={meetingChatInput}
+                  onChange={(e) => setMeetingChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && meetingChatInput.trim()) {
+                      sendMeetingMessage(activeMeeting.id);
+                    }
+                  }}
+                />
+                <button
+                  className="primary-button"
+                  onClick={() => sendMeetingMessage(activeMeeting.id)}
+                  disabled={!meetingChatInput.trim()}
+                >
+                  <Send size={16} /> Send
+                </button>
+              </div>
+            )}
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+
+  return (
+    <Panel
+      title="Meetings"
+      actions={
+        activeUser.role === "Manager" && (
+          <button
+            className="primary-button"
+            onClick={() => setIsCreatingMeeting(true)}
+          >
+            <Plus size={16} /> Schedule Meeting
+          </button>
+        )
+      }
+    >
+      {meetingError && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+          {meetingError}
+        </div>
+      )}
+
+      {isCreatingMeeting && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-4">
+          <h3 className="text-sm font-semibold mb-3">Schedule New Meeting</h3>
+          <div className="grid gap-3">
+            <Field label="Meeting Title">
+              <input
+                placeholder="Q1 Goal Check-in"
+                value={newMeetingTitle}
+                onChange={(e) => setNewMeetingTitle(e.target.value)}
+              />
+            </Field>
+            <Field label="Agenda (Optional)">
+              <textarea
+                placeholder="Review Q1 progress, discuss blockers..."
+                value={newMeetingAgenda}
+                onChange={(e) => setNewMeetingAgenda(e.target.value)}
+                rows={3}
+              />
+            </Field>
+            <Field label="Scheduled Date & Time">
+              <input
+                type="datetime-local"
+                value={newMeetingDate}
+                onChange={(e) => setNewMeetingDate(e.target.value)}
+              />
+            </Field>
+            <Field label="Participants">
+              <>
+                <div className="space-y-2">
+                  {availableParticipants.map((participant) => (
+                    <label key={participant.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedParticipantIds.includes(participant.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedParticipantIds([...selectedParticipantIds, participant.id]);
+                          } else {
+                            setSelectedParticipantIds(
+                              selectedParticipantIds.filter((id) => id !== participant.id)
+                            );
+                          }
+                        }}
+                      />
+                      <span className="text-sm">{participant.name}</span>
+                    </label>
+                  ))}
+                  {availableParticipants.length === 0 && (
+                    <div className="text-sm text-slate-500">No team members available</div>
+                  )}
+                </div>
+              </>
+            </Field>
+            <div className="flex gap-2">
+              <button className="primary-button" onClick={createMeeting}>
+                <Calendar size={16} /> Create Meeting
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setIsCreatingMeeting(false);
+                  setNewMeetingTitle("");
+                  setNewMeetingAgenda("");
+                  setNewMeetingDate("");
+                  setSelectedParticipantIds([]);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {meetings.length === 0 && (
+          <Empty text="No meetings scheduled yet" />
+        )}
+        {meetings.map((meeting) => {
+          const userParticipant = meeting.participants.find((p) => p.userId === activeUser.id);
+          const isUserHost = meeting.hostId === activeUser.id;
+
+          return (
+            <div
+              key={meeting.id}
+              className="rounded-md border border-slate-200 p-4 hover:border-blue-300 cursor-pointer transition-colors"
+              onClick={() => setActiveMeetingId(meeting.id)}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h3 className="font-semibold">{meeting.title}</h3>
+                  <p className="text-sm text-slate-600">
+                    Host: {meeting.hostName} • {new Date(meeting.scheduledAt).toLocaleString()}
+                  </p>
+                </div>
+                <span
+                  className={classNames(
+                    "rounded-full px-2 py-1 text-xs font-medium",
+                    meeting.status === "SCHEDULED" && "bg-blue-50 text-blue-700",
+                    meeting.status === "LIVE" && "bg-green-50 text-green-700",
+                    meeting.status === "ENDED" && "bg-slate-50 text-slate-700"
+                  )}
+                >
+                  {meeting.status}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <Users size={12} /> {meeting.participantCount} participants
+                </span>
+                {userParticipant && (
+                  <span className="flex items-center gap-1">
+                    You: {userParticipant.status}
+                  </span>
+                )}
+                {isUserHost && (
+                  <span className="text-blue-600 font-medium">Host</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function AdminLiveMeetings({
+  meetings,
+  activeMeetingId,
+  setActiveMeetingId,
+  meetingError,
+  updateMeetingStatus,
+  loadMeetings,
+}: {
+  meetings: Meeting[];
+  activeMeetingId: string | null;
+  setActiveMeetingId: (id: string | null) => void;
+  meetingError: string;
+  updateMeetingStatus: (meetingId: string, action: "start" | "join" | "leave" | "end" | "cancel") => void;
+  loadMeetings: () => void;
+}) {
+  const [filterStatus, setFilterStatus] = useState<MeetingStatus | "ALL">("ALL");
+  const [filterDepartment, setFilterDepartment] = useState<string>("ALL");
+
+  const activeMeeting = meetings.find((m) => m.id === activeMeetingId);
+  const departments = ["ALL", ...new Set(meetings.map((m) => m.department))];
+
+  const filteredMeetings = meetings.filter((meeting) => {
+    if (filterStatus !== "ALL" && meeting.status !== filterStatus) return false;
+    if (filterDepartment !== "ALL" && meeting.department !== filterDepartment) return false;
+    return true;
+  });
+
+  const liveMeetings = meetings.filter((m) => m.status === "LIVE");
+  const scheduledMeetings = meetings.filter((m) => m.status === "SCHEDULED");
+
+  if (activeMeetingId && activeMeeting) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <button className="secondary-button" onClick={() => setActiveMeetingId(null)}>
+            ← Back to live meetings
+          </button>
+          <button className="secondary-button" onClick={loadMeetings}>
+            <RotateCcw size={16} /> Refresh
+          </button>
+        </div>
+
+        <Panel title={`${activeMeeting.title} (Admin View)`}>
+          <div className="grid gap-4 md:grid-cols-4 mb-4">
+            <div>
+              <p className="text-xs text-slate-500">Status</p>
+              <span
+                className={classNames(
+                  "inline-flex rounded-full px-2 py-1 text-xs font-medium",
+                  activeMeeting.status === "SCHEDULED" && "bg-blue-50 text-blue-700",
+                  activeMeeting.status === "LIVE" && "bg-green-50 text-green-700",
+                  activeMeeting.status === "ENDED" && "bg-slate-50 text-slate-700"
+                )}
+              >
+                {activeMeeting.status}
+              </span>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Host</p>
+              <p className="text-sm font-medium">{activeMeeting.hostName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Department</p>
+              <p className="text-sm font-medium">{activeMeeting.department}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Participants</p>
+              <p className="text-sm font-medium">{activeMeeting.participants.length}</p>
+            </div>
+          </div>
+
+          {activeMeeting.status === "LIVE" && (
+            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-900">
+                <Clock size={14} className="inline mr-1" />
+                Meeting started:{" "}
+                {activeMeeting.startedAt
+                  ? new Date(activeMeeting.startedAt).toLocaleString()
+                  : "Unknown"}
+              </p>
+            </div>
+          )}
+
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2">Participants</h3>
+            <div className="space-y-2">
+              {activeMeeting.participants.map((participant) => (
+                <div
+                  key={participant.userId}
+                  className="flex items-center justify-between rounded-md border border-slate-200 p-2"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{participant.name}</p>
+                    <p className="text-xs text-slate-500">{participant.role}</p>
+                  </div>
+                  <div className="text-right">
+                    <span
+                      className={classNames(
+                        "rounded-full px-2 py-1 text-xs",
+                        participant.status === "INVITED" && "bg-slate-100 text-slate-600",
+                        participant.status === "JOINED" && "bg-green-100 text-green-700",
+                        participant.status === "LEFT" && "bg-slate-100 text-slate-500"
+                      )}
+                    >
+                      {participant.status}
+                    </span>
+                    {participant.joinedAt && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        Joined: {new Date(participant.joinedAt).toLocaleTimeString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2">Documents ({activeMeeting.documents.length})</h3>
+            {activeMeeting.documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between rounded-md border border-slate-200 p-2 mb-2"
+              >
+                <div>
+                  <p className="text-sm font-medium">{doc.title}</p>
+                  <p className="text-xs text-slate-500">
+                    {new Date(doc.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <a
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Open →
+                </a>
+              </div>
+            ))}
+            {activeMeeting.documents.length === 0 && (
+              <div className="text-sm text-slate-500">No documents attached</div>
+            )}
+          </div>
+
+          {activeMeeting.status === "LIVE" && (
+            <button
+              className="danger-button"
+              onClick={() => updateMeetingStatus(activeMeeting.id, "end")}
+            >
+              End Meeting (Admin)
+            </button>
+          )}
+        </Panel>
+      </div>
+    );
+  }
+
+  return (
+    <Panel
+      title="Live Meetings Dashboard"
+      actions={
+        <button className="secondary-button" onClick={loadMeetings}>
+          <RotateCcw size={16} /> Refresh
+        </button>
+      }
+    >
+      {meetingError && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+          {meetingError}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-3 mb-4">
+        <Metric
+          icon={<Video size={19} />}
+          label="Live Meetings"
+          value={liveMeetings.length}
+        />
+        <Metric
+          icon={<Calendar size={19} />}
+          label="Scheduled"
+          value={scheduledMeetings.length}
+        />
+        <Metric
+          icon={<Users size={19} />}
+          label="Total Meetings"
+          value={meetings.length}
+        />
+      </div>
+
+      <div className="mb-4 grid gap-2 md:grid-cols-2">
+        <Field label="Filter by Status">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as MeetingStatus | "ALL")}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="LIVE">Live</option>
+            <option value="ENDED">Ended</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </Field>
+        <Field label="Filter by Department">
+          <select
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
+          >
+            {departments.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept === "ALL" ? "All Departments" : dept}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <div className="space-y-3">
+        {filteredMeetings.length === 0 && (
+          <Empty text="No meetings match the selected filters" />
+        )}
+        {filteredMeetings.map((meeting) => {
+          const duration =
+            meeting.status === "LIVE" && meeting.startedAt
+              ? Math.floor(
+                  (new Date().getTime() - new Date(meeting.startedAt).getTime()) / 60000
+                )
+              : 0;
+
+          return (
+            <div
+              key={meeting.id}
+              className="rounded-md border border-slate-200 p-4 hover:border-blue-300 cursor-pointer transition-colors"
+              onClick={() => setActiveMeetingId(meeting.id)}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h3 className="font-semibold">{meeting.title}</h3>
+                  <p className="text-sm text-slate-600">
+                    {meeting.hostName} • {meeting.department}
+                  </p>
+                </div>
+                <span
+                  className={classNames(
+                    "rounded-full px-2 py-1 text-xs font-medium",
+                    meeting.status === "SCHEDULED" && "bg-blue-50 text-blue-700",
+                    meeting.status === "LIVE" && "bg-green-50 text-green-700",
+                    meeting.status === "ENDED" && "bg-slate-50 text-slate-700"
+                  )}
+                >
+                  {meeting.status}
+                </span>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4 text-xs text-slate-500">
+                <div>
+                  <p className="font-medium text-slate-700">Scheduled</p>
+                  <p>{new Date(meeting.scheduledAt).toLocaleString()}</p>
+                </div>
+                {meeting.status === "LIVE" && duration > 0 && (
+                  <div>
+                    <p className="font-medium text-slate-700">Duration</p>
+                    <p>{duration} min</p>
+                  </div>
+                )}
+                <div>
+                  <p className="font-medium text-slate-700">Participants</p>
+                  <p>
+                    {meeting.participants.filter((p) => p.status === "JOINED").length} /{" "}
+                    {meeting.participants.length}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-700">Documents</p>
+                  <p>{meeting.documents.length}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
   );
 }
