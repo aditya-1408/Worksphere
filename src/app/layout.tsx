@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@livekit/components-styles";
+import "@livekit/components-styles/prefabs";
 
 export const metadata: Metadata = {
   title: "WorkSphere Goal Portal",
