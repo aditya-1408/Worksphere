@@ -725,6 +725,13 @@ export default function Home() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   
+  // RAG Search state
+  const [ragQuery, setRagQuery] = useState("");
+  const [ragAnswer, setRagAnswer] = useState("");
+  const [ragSources, setRagSources] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showRagSearch, setShowRagSearch] = useState(false);
+  
   // LiveKit video state
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitWsUrl, setLivekitWsUrl] = useState<string | null>(null);
@@ -1106,6 +1113,54 @@ export default function Home() {
       console.error("Summary generation error:", error);
     } finally {
       setIsGeneratingSummary(false);
+    }
+  };
+
+  // Generate embeddings for meeting
+  const generateEmbeddings = async (meetingId: string) => {
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/embed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate embeddings.");
+      }
+      const data = await response.json();
+      console.log("Embeddings generated:", data);
+      return data;
+    } catch (error) {
+      console.error("Embedding generation error:", error);
+      throw error;
+    }
+  };
+
+  // Search meetings using RAG
+  const searchMeetings = async (question: string, meetingId?: string) => {
+    setIsSearching(true);
+    setMeetingError("");
+    try {
+      const response = await fetch("/api/meetings/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, meetingId, limit: 5 }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Search failed.");
+      }
+      const data = await response.json();
+      setRagAnswer(data.answer);
+      setRagSources(data.sources || []);
+      setMeetingError("");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Search failed.";
+      setMeetingError(errorMessage);
+      setRagAnswer("");
+      setRagSources([]);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -1840,6 +1895,15 @@ export default function Home() {
               showSummary={showSummary}
               setShowSummary={setShowSummary}
               generateMeetingSummary={generateMeetingSummary}
+              ragQuery={ragQuery}
+              setRagQuery={setRagQuery}
+              ragAnswer={ragAnswer}
+              ragSources={ragSources}
+              isSearching={isSearching}
+              showRagSearch={showRagSearch}
+              setShowRagSearch={setShowRagSearch}
+              searchMeetings={searchMeetings}
+              generateEmbeddings={generateEmbeddings}
             />
           )}
 
@@ -3317,6 +3381,15 @@ function MeetingsView({
   showSummary,
   setShowSummary,
   generateMeetingSummary,
+  ragQuery,
+  setRagQuery,
+  ragAnswer,
+  ragSources,
+  isSearching,
+  showRagSearch,
+  setShowRagSearch,
+  searchMeetings,
+  generateEmbeddings,
 }: {
   meetings: Meeting[];
   activeUser: User;
@@ -3354,6 +3427,15 @@ function MeetingsView({
   showSummary: boolean;
   setShowSummary: (value: boolean) => void;
   generateMeetingSummary: (meetingId: string) => void;
+  ragQuery: string;
+  setRagQuery: (value: string) => void;
+  ragAnswer: string;
+  ragSources: any[];
+  isSearching: boolean;
+  showRagSearch: boolean;
+  setShowRagSearch: (value: boolean) => void;
+  searchMeetings: (question: string, meetingId?: string) => void;
+  generateEmbeddings: (meetingId: string) => Promise<any>;
 }) {
   const [docTitle, setDocTitle] = useState("");
   const [docUrl, setDocUrl] = useState("");
