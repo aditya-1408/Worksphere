@@ -66,6 +66,16 @@ export async function POST(
       .map((doc) => `${doc.title}: ${doc.textContent || doc.fileUrl}`)
       .join("\n");
 
+    // Validate we have some content to summarize
+    if (!chatText && !documentsText && !meeting.agenda) {
+      return NextResponse.json(
+        { 
+          error: "Cannot generate summary: No meeting content available. Please ensure the meeting has chat messages, documents, or an agenda before generating a summary." 
+        },
+        { status: 400 }
+      );
+    }
+
     // Generate AI summary
     const aiSummary = await generateMeetingSummary({
       title: meeting.title,
@@ -122,16 +132,33 @@ export async function POST(
   } catch (error) {
     console.error("Summary generation error:", error);
     
-    // Update meeting to show error (just use a string status)
+    // Provide detailed error message
+    let errorMessage = "Failed to generate summary.";
+    let errorDetails = error instanceof Error ? error.message : "Unknown error";
+    
+    // Check for common issues
+    if (errorDetails.includes("API key")) {
+      errorMessage = "Gemini API key is invalid or missing.";
+      errorDetails = "Please configure GEMINI_API_KEY in your environment variables.";
+    } else if (errorDetails.includes("404") || errorDetails.includes("model")) {
+      errorMessage = "Gemini model not available.";
+      errorDetails = "The configured model may not be accessible. Try using 'gemini-1.5-flash-latest' or 'gemini-pro'.";
+    } else if (errorDetails.includes("quota") || errorDetails.includes("429")) {
+      errorMessage = "API quota exceeded.";
+      errorDetails = "You've reached the Gemini API rate limit. Please try again later.";
+    }
+    
+    // Update meeting to show error
     await prisma.meeting.update({
       where: { id: meetingId },
-      data: { summaryStatus: "ERROR" as any }, // Meeting.summaryStatus is a string
+      data: { summaryStatus: "ERROR" as any },
     });
 
     return NextResponse.json(
       { 
-        error: "Failed to generate summary.",
-        details: error instanceof Error ? error.message : "Unknown error" 
+        error: errorMessage,
+        details: errorDetails,
+        suggestion: "Check your Gemini API configuration in environment variables. Visit https://aistudio.google.com/app/apikey to get a free API key."
       },
       { status: 500 }
     );

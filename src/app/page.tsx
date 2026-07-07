@@ -1081,6 +1081,7 @@ export default function Home() {
   // Generate meeting summary
   const generateMeetingSummary = async (meetingId: string) => {
     setIsGeneratingSummary(true);
+    setMeetingError(""); // Clear previous errors
     try {
       const response = await fetch(`/api/meetings/${meetingId}/summary`, {
         method: "POST",
@@ -1088,7 +1089,10 @@ export default function Home() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to generate summary.");
+        const errorMsg = error.details 
+          ? `${error.error}\n${error.details}${error.suggestion ? `\n\n💡 ${error.suggestion}` : ''}`
+          : error.error || "Failed to generate summary.";
+        throw new Error(errorMsg);
       }
       const data = await response.json();
       setMeetingSummary(data.summary);
@@ -1097,7 +1101,9 @@ export default function Home() {
       await loadMeetings(); // Refresh to update summaryStatus
       setMeetingError("");
     } catch (error) {
-      setMeetingError(error instanceof Error ? error.message : "Failed to generate summary.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate summary.";
+      setMeetingError(errorMessage);
+      console.error("Summary generation error:", error);
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -3793,6 +3799,19 @@ function MeetingsView({
 
               {showSummary && (
                 <div className="rounded-md border border-slate-300 bg-white p-4" style={{ backgroundColor: '#ffffff' }}>
+                  {/* Error Display */}
+                  {meetingError && !meetingSummary && !isGeneratingSummary && (
+                    <div className="rounded-md bg-red-50 border border-red-200 p-4 mb-4">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-red-900 mb-1">Summary Generation Failed</h4>
+                          <p className="text-sm text-red-700 whitespace-pre-line">{meetingError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {!meetingSummary && !isGeneratingSummary && (
                     <div className="text-center py-6">
                       <p className="text-sm text-slate-600 mb-3">
@@ -3810,7 +3829,8 @@ function MeetingsView({
                   {isGeneratingSummary && (
                     <div className="text-center py-6">
                       <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
-                      <p className="text-sm text-slate-600">Generating AI summary...</p>
+                      <p className="text-sm text-slate-600">Analyzing meeting content...</p>
+                      <p className="text-xs text-slate-500 mt-2">This may take 10-30 seconds</p>
                     </div>
                   )}
 
