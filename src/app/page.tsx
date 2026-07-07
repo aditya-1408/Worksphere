@@ -1677,6 +1677,7 @@ export default function Home() {
               livekitRoomName={livekitRoomName}
               isLoadingVideo={isLoadingVideo}
               videoError={videoError}
+              loadLiveKitToken={loadLiveKitToken}
             />
           )}
 
@@ -3147,6 +3148,7 @@ function MeetingsView({
   livekitRoomName,
   isLoadingVideo,
   videoError,
+  loadLiveKitToken,
 }: {
   meetings: Meeting[];
   activeUser: User;
@@ -3177,6 +3179,7 @@ function MeetingsView({
   livekitRoomName: string | null;
   isLoadingVideo: boolean;
   videoError: string | null;
+  loadLiveKitToken: (meetingId: string) => Promise<void>;
 }) {
   const [docTitle, setDocTitle] = useState("");
   const [docUrl, setDocUrl] = useState("");
