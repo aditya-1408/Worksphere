@@ -3265,6 +3265,7 @@ function MeetingsView({
 }) {
   const [docTitle, setDocTitle] = useState("");
   const [docUrl, setDocUrl] = useState("");
+  const [uploadStatus, setUploadStatus] = useState("");
 
   const activeMeeting = meetings.find((m) => m.id === activeMeetingId);
   const isHost = activeUser.role === "Manager" && activeMeeting?.hostId === activeUser.id;
@@ -3469,31 +3470,99 @@ function MeetingsView({
               <FileText size={16} /> Documents ({activeMeeting.documents.length})
             </h3>
             {isJoined && activeMeeting.status !== "ENDED" && activeMeeting.status !== "CANCELLED" && (
-              <div className="mb-2 grid gap-2 md:grid-cols-3">
-                <input
-                  placeholder="Document title"
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  value={docTitle}
-                  onChange={(e) => setDocTitle(e.target.value)}
-                />
-                <input
-                  placeholder="docs.google.com/... (https:// auto-added)"
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  value={docUrl}
-                  onChange={(e) => setDocUrl(e.target.value)}
-                />
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    if (docTitle.trim() && docUrl.trim()) {
-                      attachDocument(activeMeeting.id, docTitle.trim(), docUrl.trim());
-                      setDocTitle("");
-                      setDocUrl("");
-                    }
-                  }}
-                >
-                  <Plus size={16} /> Attach
-                </button>
+              <div className="mb-3 space-y-2">
+                {/* Upload Status */}
+                {uploadStatus && (
+                  <div className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">
+                    {uploadStatus}
+                  </div>
+                )}
+                
+                {/* File Upload Option */}
+                <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                  <p className="text-xs font-semibold text-blue-900 mb-2">📎 Upload File</p>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <input
+                      placeholder="Document title"
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
+                      value={docTitle}
+                      onChange={(e) => setDocTitle(e.target.value)}
+                    />
+                    <input
+                      type="file"
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file && docTitle.trim()) {
+                          setUploadStatus("Uploading...");
+                          try {
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            const response = await fetch("/api/upload", {
+                              method: "POST",
+                              body: formData,
+                            });
+                            if (!response.ok) {
+                              const error = await response.json();
+                              throw new Error(error.error || "Upload failed");
+                            }
+                            const data = await response.json();
+                            await attachDocument(activeMeeting.id, docTitle.trim(), data.url);
+                            setDocTitle("");
+                            e.target.value = "";
+                            setUploadStatus("✅ Uploaded successfully!");
+                            setTimeout(() => setUploadStatus(""), 2000);
+                          } catch (error) {
+                            setUploadStatus(error instanceof Error ? `❌ ${error.message}` : "❌ Upload failed");
+                            setTimeout(() => setUploadStatus(""), 3000);
+                          }
+                        } else if (!docTitle.trim()) {
+                          setUploadStatus("⚠️ Please enter a document title first");
+                          setTimeout(() => setUploadStatus(""), 2000);
+                        }
+                      }}
+                    />
+                    <button
+                      className="secondary-button"
+                      onClick={() => {
+                        document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+                      }}
+                    >
+                      <Plus size={16} /> Choose File
+                    </button>
+                  </div>
+                </div>
+                
+                {/* URL Option */}
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-700 mb-2">🔗 Or Share Link</p>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <input
+                      placeholder="Document title"
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
+                      value={docUrl.startsWith('http') ? '' : docTitle}
+                      onChange={(e) => setDocTitle(e.target.value)}
+                    />
+                    <input
+                      placeholder="docs.google.com/... (https:// auto-added)"
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
+                      value={docUrl}
+                      onChange={(e) => setDocUrl(e.target.value)}
+                    />
+                    <button
+                      className="secondary-button"
+                      onClick={() => {
+                        if (docTitle.trim() && docUrl.trim()) {
+                          attachDocument(activeMeeting.id, docTitle.trim(), docUrl.trim());
+                          setDocTitle("");
+                          setDocUrl("");
+                        }
+                      }}
+                    >
+                      <Plus size={16} /> Attach Link
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
             <div className="space-y-2">
