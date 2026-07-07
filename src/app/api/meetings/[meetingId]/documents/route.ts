@@ -17,7 +17,16 @@ type RouteContext = { params: Promise<{ meetingId: string }> };
 
 async function canManageMeeting(meetingId: string, userId: string, role: string) {
   const meeting = await prisma.meeting.findFirst({
-    where: role === "ADMIN" ? { id: meetingId } : { id: meetingId, hostId: userId },
+    where:
+      role === "ADMIN"
+        ? { id: meetingId }
+        : { 
+            id: meetingId, 
+            OR: [
+              { hostId: userId }, 
+              { participants: { some: { userId, status: "JOINED" } } }
+            ]
+          },
     select: { id: true },
   });
   return Boolean(meeting);
@@ -28,7 +37,7 @@ export async function POST(request: Request, context: RouteContext) {
   if (!sessionUser) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { meetingId } = await context.params;
   if (!(await canManageMeeting(meetingId, sessionUser.id, sessionUser.role))) {
-    return NextResponse.json({ error: "Only the host or admin can attach documents." }, { status: 403 });
+    return NextResponse.json({ error: "Only joined participants can attach documents." }, { status: 403 });
   }
   const parsed = documentSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid document." }, { status: 400 });

@@ -20,6 +20,33 @@ async function canAccessMeeting(meetingId: string, userId: string, role: string)
   return Boolean(meeting);
 }
 
+export async function GET(request: Request, context: RouteContext) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  
+  const { meetingId } = await context.params;
+  if (!(await canAccessMeeting(meetingId, sessionUser.id, sessionUser.role))) {
+    return NextResponse.json({ error: "Meeting not found or access denied." }, { status: 404 });
+  }
+
+  const messages = await prisma.meetingMessage.findMany({
+    where: { meetingId },
+    include: { sender: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return NextResponse.json({
+    messages: messages.map((msg) => ({
+      id: msg.id,
+      meetingId: msg.meetingId,
+      senderId: msg.senderId,
+      senderName: msg.sender.name,
+      body: msg.body,
+      createdAt: msg.createdAt.toISOString(),
+    })),
+  });
+}
+
 export async function POST(request: Request, context: RouteContext) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
