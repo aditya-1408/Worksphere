@@ -35,8 +35,8 @@ function geminiModel() {
   const configuredModel = process.env.GEMINI_MODEL?.trim();
   if (configuredModel) return configuredModel;
   
-  // Fallback models in order of preference
-  return "gemini-1.5-flash-latest";
+  // Fallback models in order of preference (Gemini 2.5 is newer and better)
+  return "gemini-2.5-flash";
 }
 
 function extractJson(text: string) {
@@ -157,6 +157,7 @@ Generate the analysis now:`;
             topP: 0.95,
             topK: 40,
             maxOutputTokens: 2048,
+            // Don't use responseMimeType for Gemini 2.5 - it's not supported
           },
         }),
       },
@@ -167,10 +168,10 @@ Generate the analysis now:`;
       console.error("Gemini API error:", response.status, errorText);
       
       // Try with a different model if this one fails
-      if (modelName !== "gemini-1.5-flash" && modelName !== "gemini-pro") {
-        console.log("Retrying with fallback model: gemini-1.5-flash");
+      if (modelName !== "gemini-2.5-flash" && modelName !== "gemini-pro") {
+        console.log("Retrying with fallback model: gemini-2.5-flash");
         const fallbackResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
