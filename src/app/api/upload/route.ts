@@ -25,8 +25,10 @@ export async function POST(request: Request) {
     }
 
     // Upload to Vercel Blob
+    // If store is private, files will need signed URLs to download
+    // If store is public, files are publicly accessible
     const blob = await put(file.name, file, {
-      access: "public",
+      access: "public", // Try public first
       addRandomSuffix: true,
     });
 
