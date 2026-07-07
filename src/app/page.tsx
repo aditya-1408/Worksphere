@@ -3305,6 +3305,14 @@ function MeetingsView({
               <div>LiveKit URL: {livekitWsUrl ? "✅" : "❌ Missing"}</div>
               <div>Room Name: {livekitRoomName ? "✅" : "❌ Missing"}</div>
               <div>Can Show Video: {canShowVideo ? "✅ YES" : "❌ NO"}</div>
+              {!livekitToken && (
+                <button
+                  className="mt-2 rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+                  onClick={() => loadLiveKitToken(activeMeeting.id)}
+                >
+                  🔄 Manually Load Video Token
+                </button>
+              )}
             </div>
           )}
 
