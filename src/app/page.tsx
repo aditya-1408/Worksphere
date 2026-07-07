@@ -933,20 +933,32 @@ export default function Home() {
     setIsLoadingVideo(true);
     setVideoError(null);
     try {
+      console.log("Fetching LiveKit token for meeting:", meetingId);
       const response = await fetch(`/api/meetings/${meetingId}/livekit-token`, {
         cache: "no-store",
       });
+      console.log("LiveKit token response status:", response.status);
+      
       if (!response.ok) {
         const error = await response.json();
+        console.error("LiveKit token error:", error);
         throw new Error(error.error || "Failed to get video token");
       }
+      
       const data = await response.json();
+      console.log("LiveKit token data received:", {
+        hasToken: !!data.token,
+        hasWsUrl: !!data.wsUrl,
+        hasRoomName: !!data.roomName,
+      });
+      
       setLivekitToken(data.token);
       setLivekitWsUrl(data.wsUrl);
       setLivekitRoomName(data.roomName);
     } catch (error) {
-      setVideoError(error instanceof Error ? error.message : "Failed to load video");
-      console.error("LiveKit token error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to load video";
+      console.error("LiveKit token loading failed:", error);
+      setVideoError(errorMessage);
     } finally {
       setIsLoadingVideo(false);
     }
