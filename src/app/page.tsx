@@ -860,9 +860,29 @@ export default function Home() {
       if (!response.ok) throw new Error("Could not load meetings.");
       const data = (await response.json()) as { meetings: Meeting[] };
       setMeetings(data.meetings);
+      
+      // If there's an active meeting, reload its messages
+      if (activeMeetingId) {
+        await loadMeetingMessages(activeMeetingId);
+      }
+      
       setMeetingError("");
     } catch (error) {
       setMeetingError(error instanceof Error ? error.message : "Failed to load meetings.");
+    }
+  };
+
+  // Load messages for a specific meeting
+  const loadMeetingMessages = async (meetingId: string) => {
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/messages`, { 
+        cache: "no-store" 
+      });
+      if (!response.ok) throw new Error("Could not load messages.");
+      const data = (await response.json()) as { messages: MeetingMessage[] };
+      setMeetingMessages(data.messages);
+    } catch (error) {
+      console.error("Failed to load messages:", error);
     }
   };
 
@@ -1005,6 +1025,22 @@ export default function Home() {
       loadMeetings();
     }
   }, [activeUser, view]);
+
+  // Load messages when active meeting changes
+  useEffect(() => {
+    if (activeMeetingId) {
+      loadMeetingMessages(activeMeetingId);
+      
+      // Poll for new messages every 3 seconds while meeting is active
+      const pollInterval = setInterval(() => {
+        loadMeetingMessages(activeMeetingId);
+      }, 3000);
+      
+      return () => clearInterval(pollInterval);
+    } else {
+      setMeetingMessages([]);
+    }
+  }, [activeMeetingId]);
 
   const nav = useMemo(() => {
     if (!activeUser) return [];
@@ -3339,8 +3375,15 @@ function MeetingsView({
                   video={true}
                   audio={true}
                   style={{ height: "100%" }}
+                  options={{
+                    adaptiveStream: true,
+                    dynacast: true,
+                  }}
                 >
-                  <VideoConference />
+                  <VideoConference 
+                    chatMessageFormatter={(message) => message}
+                    SettingsComponent={undefined}
+                  />
                   <RoomAudioRenderer />
                 </LiveKitRoom>
               </div>
@@ -3382,7 +3425,7 @@ function MeetingsView({
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
               <FileText size={16} /> Documents ({activeMeeting.documents.length})
             </h3>
-            {isHost && activeMeeting.status !== "ENDED" && (
+            {isJoined && activeMeeting.status !== "ENDED" && activeMeeting.status !== "CANCELLED" && (
               <div className="mb-2 grid gap-2 md:grid-cols-3">
                 <input
                   placeholder="Document title"
