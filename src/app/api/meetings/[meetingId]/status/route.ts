@@ -36,21 +36,39 @@ export async function POST(request: Request, context: RouteContext) {
   }
   if (parsed.data.action === "end") {
     await prisma.meeting.update({ where: { id: meetingId }, data: { status: "ENDED", endedAt: now } });
+    // Auto-disconnect all participants when meeting ends
+    await prisma.meetingParticipant.updateMany({
+      where: { meetingId, status: "JOINED" },
+      data: { status: "LEFT", leftAt: now },
+    });
   }
   if (parsed.data.action === "cancel") {
     await prisma.meeting.update({ where: { id: meetingId }, data: { status: "CANCELLED", endedAt: now } });
   }
-  if (parsed.data.action === "join") {
-    await prisma.meetingParticipant.upsert({
-      where: { meetingId_userId: { meetingId, userId: sessionUser.id } },
-      update: { status: "JOINED", joinedAt: now, leftAt: null },
-      create: { meetingId, userId: sessionUser.id, status: "JOINED", joinedAt: now },
-    });
-  }
   if (parsed.data.action === "leave") {
+    // Mark as LEFT but with a grace period for reconnection
     await prisma.meetingParticipant.updateMany({
       where: { meetingId, userId: sessionUser.id },
       data: { status: "LEFT", leftAt: now },
+    });
+  }
+  if (parsed.data.action === "join") {
+    // Check if rejoining within 30 seconds (reconnect buffer)
+    const existing = await prisma.meetingParticipant.findUnique({
+      where: { meetingId_userId: { meetingId, userId: sessionUser.id } },
+    });
+    
+    const isReconnecting = existing?.leftAt && 
+      (now.getTime() - existing.leftAt.getTime()) < 30000; // 30 second buffer
+    
+    await prisma.meetingParticipant.upsert({
+      where: { meetingId_userId: { meetingId, userId: sessionUser.id } },
+      update: { 
+        status: "JOINED", 
+        joinedAt: isReconnecting ? existing.joinedAt : now, // Preserve original join time if reconnecting
+        leftAt: null 
+      },
+      create: { meetingId, userId: sessionUser.id, status: "JOINED", joinedAt: now },
     });
   }
 

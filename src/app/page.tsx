@@ -1060,7 +1060,24 @@ export default function Home() {
         loadMeetingMessages(activeMeetingId);
       }, 3000);
       
-      return () => clearInterval(pollInterval);
+      // Also poll meeting status to detect if it ended
+      const statusInterval = setInterval(async () => {
+        await loadMeetings();
+        
+        // Check if current meeting ended
+        const currentMeeting = meetings.find(m => m.id === activeMeetingId);
+        if (currentMeeting && (currentMeeting.status === "ENDED" || currentMeeting.status === "CANCELLED")) {
+          // Meeting ended - clear video
+          setLivekitToken(null);
+          setLivekitWsUrl(null);
+          setLivekitRoomName(null);
+        }
+      }, 5000); // Check every 5 seconds
+      
+      return () => {
+        clearInterval(pollInterval);
+        clearInterval(statusInterval);
+      };
     } else {
       setMeetingMessages([]);
     }
@@ -3277,6 +3294,25 @@ function MeetingsView({
   if (activeMeetingId && activeMeeting) {
     return (
       <div className="space-y-4">
+        {/* Meeting Ended Banner */}
+        {(activeMeeting.status === "ENDED" || activeMeeting.status === "CANCELLED") && (
+          <div className="rounded-lg border-2 border-red-300 bg-red-50 p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={24} className="text-red-600" />
+              <div>
+                <h3 className="font-semibold text-red-900">
+                  Meeting {activeMeeting.status === "ENDED" ? "Ended" : "Cancelled"}
+                </h3>
+                <p className="text-sm text-red-700">
+                  {activeMeeting.status === "ENDED" 
+                    ? `This meeting ended at ${activeMeeting.endedAt ? new Date(activeMeeting.endedAt).toLocaleTimeString() : "unknown"}`
+                    : "This meeting was cancelled by the host"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="flex items-center justify-between">
           <button className="secondary-button" onClick={() => setActiveMeetingId(null)}>
             ← Back to meetings
@@ -3358,7 +3394,11 @@ function MeetingsView({
             {isHost && activeMeeting.status === "LIVE" && (
               <button
                 className="danger-button"
-                onClick={() => updateMeetingStatus(activeMeeting.id, "end")}
+                onClick={() => {
+                  if (window.confirm(`End "${activeMeeting.title}"? This will disconnect all participants.`)) {
+                    updateMeetingStatus(activeMeeting.id, "end");
+                  }
+                }}
               >
                 End Meeting
               </button>
@@ -3366,6 +3406,12 @@ function MeetingsView({
             {activeMeeting.status === "ENDED" && (
               <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
                 Meeting ended at {activeMeeting.endedAt ? new Date(activeMeeting.endedAt).toLocaleString() : "unknown"}
+              </div>
+            )}
+            
+            {activeMeeting.status === "CANCELLED" && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                Meeting was cancelled
               </div>
             )}
           </div>
