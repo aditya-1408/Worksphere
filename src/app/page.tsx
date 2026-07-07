@@ -28,24 +28,14 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useTracks } from "@livekit/components-react";
-import { Track } from "livekit-client";
 
 // Dynamically import LiveKit components (client-side only)
 const LiveKitRoom = dynamic(
   () => import("@livekit/components-react").then((mod) => mod.LiveKitRoom),
   { ssr: false }
 );
-const GridLayout = dynamic(
-  () => import("@livekit/components-react").then((mod) => mod.GridLayout),
-  { ssr: false }
-);
-const ParticipantTile = dynamic(
-  () => import("@livekit/components-react").then((mod) => mod.ParticipantTile),
-  { ssr: false }
-);
-const ControlBar = dynamic(
-  () => import("@livekit/components-react").then((mod) => mod.ControlBar),
+const VideoConference = dynamic(
+  () => import("@livekit/components-react").then((mod) => mod.VideoConference),
   { ssr: false }
 );
 const RoomAudioRenderer = dynamic(
@@ -3203,42 +3193,6 @@ function ConfirmationDialog({
   );
 }
 
-// Custom video grid component that shows all participants in a grid
-function MyVideoGrid() {
-  const tracks = useTracks(
-    [
-      { source: Track.Source.Camera, withPlaceholder: true },
-      { source: Track.Source.ScreenShare, withPlaceholder: false },
-    ],
-    { onlySubscribed: false }
-  );
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#1a1a1a" }}>
-      <GridLayout tracks={tracks} style={{ flex: 1, minHeight: 0 }}>
-        <ParticipantTile />
-      </GridLayout>
-      <div style={{ 
-        padding: "12px", 
-        display: "flex", 
-        justifyContent: "center", 
-        background: "rgba(0,0,0,0.8)",
-        gap: "8px"
-      }}>
-        <ControlBar 
-          variation="minimal"
-          controls={{ 
-            camera: true, 
-            microphone: true, 
-            screenShare: true, 
-            leave: true 
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function MeetingsView({
   meetings,
   activeUser,
@@ -3496,7 +3450,7 @@ function MeetingsView({
                     dynacast: true,
                   }}
                 >
-                  <MyVideoGrid />
+                  <VideoConference />
                   <RoomAudioRenderer />
                 </LiveKitRoom>
               </div>
