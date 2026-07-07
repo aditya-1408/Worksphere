@@ -3214,12 +3214,26 @@ function MyVideoGrid() {
   );
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <GridLayout tracks={tracks} style={{ flex: 1 }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#1a1a1a" }}>
+      <GridLayout tracks={tracks} style={{ flex: 1, minHeight: 0 }}>
         <ParticipantTile />
       </GridLayout>
-      <div style={{ padding: "8px", display: "flex", justifyContent: "center" }}>
-        <ControlBar />
+      <div style={{ 
+        padding: "12px", 
+        display: "flex", 
+        justifyContent: "center", 
+        background: "rgba(0,0,0,0.8)",
+        gap: "8px"
+      }}>
+        <ControlBar 
+          variation="minimal"
+          controls={{ 
+            camera: true, 
+            microphone: true, 
+            screenShare: true, 
+            leave: true 
+          }}
+        />
       </div>
     </div>
   );
