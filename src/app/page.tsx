@@ -3437,14 +3437,14 @@ function MeetingsView({
               <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 <Video size={16} /> Live Video Room
               </h3>
-              <div className="rounded-lg overflow-hidden bg-slate-900" style={{ height: "500px" }}>
+              <div className="rounded-lg overflow-hidden bg-black border-2 border-slate-700" style={{ height: "600px" }}>
                 <LiveKitRoom
                   token={livekitToken}
                   serverUrl={livekitWsUrl}
                   connect={true}
                   video={true}
                   audio={true}
-                  style={{ height: "100%" }}
+                  style={{ height: "100%", display: "flex", flexDirection: "column" }}
                   options={{
                     adaptiveStream: true,
                     dynacast: true,

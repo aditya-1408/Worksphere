@@ -781,76 +781,60 @@ td {
   }
 }
 
-
-/* LiveKit Video Room Styles */
+/* LiveKit Video Room - Let LiveKit styles handle the UI */
 .lk-video-conference {
-  height: 100%;
-  background: #1a1a1a;
+  height: 100% !important;
 }
 
-.lk-grid-layout {
-  height: 100%;
-  display: grid;
-  gap: 8px;
-  padding: 8px;
-}
-
-.lk-participant-tile {
-  border-radius: 8px;
-  overflow: hidden;
-  background: #2a2a2a;
-  position: relative;
-}
-
-.lk-participant-tile video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
+/* Ensure control bar is always visible at bottom */
 .lk-control-bar {
-  background: rgba(0, 0, 0, 0.8);
-  padding: 12px;
-  border-radius: 8px;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  align-items: center;
+  position: relative !important;
+  z-index: 50 !important;
+  margin-top: auto !important;
 }
 
+/* Make buttons clearly visible */
 .lk-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  color: white;
-  transition: background 0.2s;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
 }
 
 .lk-button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  transform: scale(1.05) !important;
 }
 
-.lk-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.lk-button:active,
+.lk-button[data-lk-active="true"] {
+  background: rgba(59, 130, 246, 0.8) !important;
+  border-color: rgba(59, 130, 246, 1) !important;
 }
 
-.lk-focus-layout {
-  height: 100%;
+/* Red button for leave */
+.lk-button[data-lk-source="leave"],
+.lk-disconnect-button {
+  background: rgba(239, 68, 68, 0.8) !important;
+  border-color: rgba(239, 68, 68, 1) !important;
 }
 
-.lk-participant-metadata {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 4px 8px;
-  border-radius: 4px;
-  color: white;
-  font-size: 12px;
+.lk-button[data-lk-source="leave"]:hover,
+.lk-disconnect-button:hover {
+  background: rgba(220, 38, 38, 0.9) !important;
 }
+
+/* Icon sizing */
+.lk-button svg,
+.lk-button path {
+  width: 20px !important;
+  height: 20px !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
