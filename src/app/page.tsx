@@ -3635,16 +3635,16 @@ function MeetingsView({
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
               <MessageSquare size={16} /> Meeting Chat
             </h3>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 max-h-64 overflow-y-auto mb-2">
+            <div className="rounded-md border border-slate-300 bg-white p-3 max-h-64 overflow-y-auto mb-2" style={{ backgroundColor: '#ffffff' }}>
               {meetingMessages.length === 0 && (
                 <div className="text-sm text-slate-500">No messages yet</div>
               )}
               {meetingMessages.map((msg) => (
-                <div key={msg.id} className="mb-2">
-                  <p className="text-xs text-slate-500">
+                <div key={msg.id} className="mb-3 p-2 rounded bg-slate-50 border border-slate-200" style={{ backgroundColor: '#f8fafc' }}>
+                  <p className="text-xs font-medium text-slate-700 mb-1" style={{ color: '#334155' }}>
                     {msg.senderName} • {new Date(msg.createdAt).toLocaleTimeString()}
                   </p>
-                  <p className="text-sm text-slate-900">{msg.body}</p>
+                  <p className="text-sm text-slate-900" style={{ color: '#0f172a' }}>{msg.body}</p>
                 </div>
               ))}
             </div>
@@ -3652,7 +3652,8 @@ function MeetingsView({
               <div className="flex gap-2">
                 <input
                   placeholder="Type a message..."
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
+                  style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
                   value={meetingChatInput}
                   onChange={(e) => setMeetingChatInput(e.target.value)}
                   onKeyDown={(e) => {
