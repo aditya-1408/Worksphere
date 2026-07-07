@@ -73,6 +73,17 @@ export async function POST(request: Request, context: RouteContext) {
       where: { meetingId, status: "JOINED" },
       data: { status: "LEFT", leftAt: now },
     });
+    
+    // Trigger AI summary generation asynchronously (don't wait for it)
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL || request.url.split('/api/')[0]}/api/meetings/${meetingId}/summary`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Cookie": request.headers.get("Cookie") || "",
+      },
+    }).catch((error) => {
+      console.error("Failed to trigger summary generation:", error);
+    });
   }
   if (parsed.data.action === "cancel") {
     await prisma.meeting.update({ where: { id: meetingId }, data: { status: "CANCELLED", endedAt: now } });

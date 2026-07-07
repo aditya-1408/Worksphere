@@ -148,6 +148,28 @@ type MeetingMessage = {
   createdAt: string;
 };
 
+type MeetingSummary = {
+  id: string;
+  meetingId: string;
+  summary: string;
+  discussionPoints: string[];
+  decisions: string[];
+  blockers: string[];
+  sentiment: string;
+  followUps: string[];
+  createdAt: string;
+};
+
+type MeetingActionItem = {
+  id: string;
+  meetingId: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  status: string;
+  createdAt: string;
+};
+
 type Meeting = {
   id: string;
   title: string;
@@ -697,6 +719,12 @@ export default function Home() {
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
   const [meetingError, setMeetingError] = useState("");
   
+  // Meeting summary state
+  const [meetingSummary, setMeetingSummary] = useState<MeetingSummary | null>(null);
+  const [meetingActionItems, setMeetingActionItems] = useState<MeetingActionItem[]>([]);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  
   // LiveKit video state
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitWsUrl, setLivekitWsUrl] = useState<string | null>(null);
@@ -1033,6 +1061,48 @@ export default function Home() {
     }
   };
 
+  // Load meeting summary
+  const loadMeetingSummary = async (meetingId: string) => {
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/summary`, {
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Could not load summary.");
+      const data = await response.json();
+      setMeetingSummary(data.summary);
+      setMeetingActionItems(data.actionItems || []);
+    } catch (error) {
+      console.error("Failed to load summary:", error);
+      setMeetingSummary(null);
+      setMeetingActionItems([]);
+    }
+  };
+
+  // Generate meeting summary
+  const generateMeetingSummary = async (meetingId: string) => {
+    setIsGeneratingSummary(true);
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate summary.");
+      }
+      const data = await response.json();
+      setMeetingSummary(data.summary);
+      setMeetingActionItems(data.actionItems || []);
+      setShowSummary(true);
+      await loadMeetings(); // Refresh to update summaryStatus
+      setMeetingError("");
+    } catch (error) {
+      setMeetingError(error instanceof Error ? error.message : "Failed to generate summary.");
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
   // Load meetings when user logs in or view changes to Meetings
   useEffect(() => {
     if (activeUser && (view === "Meetings" || view === "Live Meetings")) {
@@ -1040,10 +1110,11 @@ export default function Home() {
     }
   }, [activeUser, view]);
 
-  // Load messages when active meeting changes
+  // Load messages and summary when active meeting changes
   useEffect(() => {
     if (activeMeetingId) {
       loadMeetingMessages(activeMeetingId);
+      loadMeetingSummary(activeMeetingId);
       
       // Poll for new messages every 3 seconds while meeting is active
       const pollInterval = setInterval(() => {
@@ -1061,6 +1132,7 @@ export default function Home() {
             // Only reload if status changed to ENDED or CANCELLED
             if (data.meeting?.status === "ENDED" || data.meeting?.status === "CANCELLED") {
               await loadMeetings();
+              await loadMeetingSummary(activeMeetingId); // Load summary when meeting ends
               // Clear video
               setLivekitToken(null);
               setLivekitWsUrl(null);
@@ -1078,6 +1150,9 @@ export default function Home() {
       };
     } else {
       setMeetingMessages([]);
+      setMeetingSummary(null);
+      setMeetingActionItems([]);
+      setShowSummary(false);
     }
   }, [activeMeetingId]);
 
@@ -1753,6 +1828,12 @@ export default function Home() {
               isLoadingVideo={isLoadingVideo}
               videoError={videoError}
               loadLiveKitToken={loadLiveKitToken}
+              meetingSummary={meetingSummary}
+              meetingActionItems={meetingActionItems}
+              isGeneratingSummary={isGeneratingSummary}
+              showSummary={showSummary}
+              setShowSummary={setShowSummary}
+              generateMeetingSummary={generateMeetingSummary}
             />
           )}
 
@@ -3224,6 +3305,12 @@ function MeetingsView({
   isLoadingVideo,
   videoError,
   loadLiveKitToken,
+  meetingSummary,
+  meetingActionItems,
+  isGeneratingSummary,
+  showSummary,
+  setShowSummary,
+  generateMeetingSummary,
 }: {
   meetings: Meeting[];
   activeUser: User;
@@ -3255,6 +3342,12 @@ function MeetingsView({
   isLoadingVideo: boolean;
   videoError: string | null;
   loadLiveKitToken: (meetingId: string) => Promise<void>;
+  meetingSummary: MeetingSummary | null;
+  meetingActionItems: MeetingActionItem[];
+  isGeneratingSummary: boolean;
+  showSummary: boolean;
+  setShowSummary: (value: boolean) => void;
+  generateMeetingSummary: (meetingId: string) => void;
 }) {
   const [docTitle, setDocTitle] = useState("");
   const [docUrl, setDocUrl] = useState("");
@@ -3672,6 +3765,184 @@ function MeetingsView({
               </div>
             )}
           </div>
+
+          {/* Meeting Summary Section */}
+          {(activeMeeting.status === "ENDED" || activeMeeting.status === "CANCELLED") && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <BarChart3 size={16} /> AI Meeting Summary
+                </h3>
+                {!showSummary && (
+                  <button
+                    className="text-sm text-blue-600 hover:underline"
+                    onClick={() => setShowSummary(true)}
+                  >
+                    {meetingSummary ? 'Show Summary' : 'Generate Summary'}
+                  </button>
+                )}
+                {showSummary && (
+                  <button
+                    className="text-sm text-slate-600 hover:underline"
+                    onClick={() => setShowSummary(false)}
+                  >
+                    Hide
+                  </button>
+                )}
+              </div>
+
+              {showSummary && (
+                <div className="rounded-md border border-slate-300 bg-white p-4" style={{ backgroundColor: '#ffffff' }}>
+                  {!meetingSummary && !isGeneratingSummary && (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-slate-600 mb-3">
+                        Generate an AI-powered summary of this meeting including key points, decisions, and action items.
+                      </p>
+                      <button
+                        className="primary-button"
+                        onClick={() => generateMeetingSummary(activeMeeting.id)}
+                      >
+                        <BarChart3 size={16} /> Generate AI Summary
+                      </button>
+                    </div>
+                  )}
+
+                  {isGeneratingSummary && (
+                    <div className="text-center py-6">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                      <p className="text-sm text-slate-600">Generating AI summary...</p>
+                    </div>
+                  )}
+
+                  {meetingSummary && !isGeneratingSummary && (
+                    <div className="space-y-4">
+                      {/* Summary Text */}
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2 text-slate-900">Summary</h4>
+                        <p className="text-sm text-slate-700" style={{ color: '#334155' }}>
+                          {meetingSummary.summary}
+                        </p>
+                      </div>
+
+                      {/* Discussion Points */}
+                      {meetingSummary.discussionPoints.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2 text-slate-900">Key Discussion Points</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            {meetingSummary.discussionPoints.map((point, idx) => (
+                              <li key={idx} className="text-sm text-slate-700" style={{ color: '#334155' }}>
+                                {point}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Decisions */}
+                      {meetingSummary.decisions.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2 text-slate-900">Decisions Made</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            {meetingSummary.decisions.map((decision, idx) => (
+                              <li key={idx} className="text-sm text-green-700">
+                                {decision}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Blockers */}
+                      {meetingSummary.blockers.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2 text-slate-900">Blockers & Issues</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {meetingSummary.blockers.map((blocker, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs text-red-700"
+                              >
+                                <AlertTriangle size={12} /> {blocker}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sentiment */}
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2 text-slate-900">Overall Sentiment</h4>
+                        <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700">
+                          {meetingSummary.sentiment}
+                        </span>
+                      </div>
+
+                      {/* Follow-ups */}
+                      {meetingSummary.followUps.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2 text-slate-900">Follow-up Items</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            {meetingSummary.followUps.map((item, idx) => (
+                              <li key={idx} className="text-sm text-slate-700" style={{ color: '#334155' }}>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Action Items */}
+                      {meetingActionItems.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2 text-slate-900">Action Items</h4>
+                          <div className="space-y-2">
+                            {meetingActionItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                                style={{ backgroundColor: '#f8fafc' }}
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-slate-900">{item.title}</p>
+                                    {item.description && (
+                                      <p className="text-xs text-slate-600 mt-1">{item.description}</p>
+                                    )}
+                                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+                                      {item.dueDate && (
+                                        <span className="flex items-center gap-1">
+                                          <Clock size={12} /> {new Date(item.dueDate).toLocaleDateString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span
+                                    className={classNames(
+                                      "rounded-full px-2 py-1 text-xs",
+                                      item.status === "PENDING" && "bg-yellow-100 text-yellow-700",
+                                      item.status === "IN_PROGRESS" && "bg-blue-100 text-blue-700",
+                                      item.status === "COMPLETED" && "bg-green-100 text-green-700"
+                                    )}
+                                  >
+                                    {item.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Generated timestamp */}
+                      <div className="text-xs text-slate-500 pt-2 border-t border-slate-200">
+                        Summary generated: {new Date(meetingSummary.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </Panel>
       </div>
     );
