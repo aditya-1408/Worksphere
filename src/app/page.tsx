@@ -1016,10 +1016,16 @@ export default function Home() {
   // Attach document URL
   const attachDocument = async (meetingId: string, title: string, fileUrl: string) => {
     try {
+      // Auto-add https:// if no protocol specified
+      let validUrl = fileUrl.trim();
+      if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
+        validUrl = 'https://' + validUrl;
+      }
+      
       const response = await fetch(`/api/meetings/${meetingId}/documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, fileUrl }),
+        body: JSON.stringify({ title, fileUrl: validUrl }),
       });
       
       if (!response.ok) {
@@ -3471,7 +3477,7 @@ function MeetingsView({
                   onChange={(e) => setDocTitle(e.target.value)}
                 />
                 <input
-                  placeholder="https://docs.example.com/file"
+                  placeholder="docs.google.com/... (https:// auto-added)"
                   className="rounded-md border border-slate-300 px-3 py-2 text-sm"
                   value={docUrl}
                   onChange={(e) => setDocUrl(e.target.value)}
