@@ -21,8 +21,27 @@ import {
   Users,
   FileText,
   Clock,
+  Monitor,
+  Mic,
+  MicOff,
+  VideoOff,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+
+// Dynamically import LiveKit components (client-side only)
+const LiveKitRoom = dynamic(
+  () => import("@livekit/components-react").then((mod) => mod.LiveKitRoom),
+  { ssr: false }
+);
+const VideoConference = dynamic(
+  () => import("@livekit/components-react").then((mod) => mod.VideoConference),
+  { ssr: false }
+);
+const RoomAudioRenderer = dynamic(
+  () => import("@livekit/components-react").then((mod) => mod.RoomAudioRenderer),
+  { ssr: false }
+);
 
 type Role = "Employee" | "Manager" | "Admin";
 type UomType = "Numeric" | "Percentage" | "Timeline" | "Zero";
@@ -677,6 +696,13 @@ export default function Home() {
   const [newMeetingDate, setNewMeetingDate] = useState("");
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
   const [meetingError, setMeetingError] = useState("");
+  
+  // LiveKit video state
+  const [livekitToken, setLivekitToken] = useState<string | null>(null);
+  const [livekitWsUrl, setLivekitWsUrl] = useState<string | null>(null);
+  const [livekitRoomName, setLivekitRoomName] = useState<string | null>(null);
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   const loadDatabaseState = async (userId: string) => {
     const response = await fetch("/api/state", { cache: "no-store" });
@@ -883,9 +909,46 @@ export default function Home() {
       });
       if (!response.ok) throw new Error(`Could not ${action} meeting.`);
       await loadMeetings();
+      
+      // If joining, get LiveKit token
+      if (action === "join") {
+        await loadLiveKitToken(meetingId);
+      }
+      
+      // If leaving or ending, clear video
+      if (action === "leave" || action === "end") {
+        setLivekitToken(null);
+        setLivekitWsUrl(null);
+        setLivekitRoomName(null);
+      }
+      
       setMeetingError("");
     } catch (error) {
       setMeetingError(error instanceof Error ? error.message : `Failed to ${action} meeting.`);
+    }
+  };
+  
+  // Load LiveKit token for video
+  const loadLiveKitToken = async (meetingId: string) => {
+    setIsLoadingVideo(true);
+    setVideoError(null);
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/livekit-token`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to get video token");
+      }
+      const data = await response.json();
+      setLivekitToken(data.token);
+      setLivekitWsUrl(data.wsUrl);
+      setLivekitRoomName(data.roomName);
+    } catch (error) {
+      setVideoError(error instanceof Error ? error.message : "Failed to load video");
+      console.error("LiveKit token error:", error);
+    } finally {
+      setIsLoadingVideo(false);
     }
   };
 
@@ -1597,6 +1660,11 @@ export default function Home() {
               sendMeetingMessage={sendMeetingMessage}
               attachDocument={attachDocument}
               loadMeetings={loadMeetings}
+              livekitToken={livekitToken}
+              livekitWsUrl={livekitWsUrl}
+              livekitRoomName={livekitRoomName}
+              isLoadingVideo={isLoadingVideo}
+              videoError={videoError}
             />
           )}
 
@@ -3062,6 +3130,11 @@ function MeetingsView({
   sendMeetingMessage,
   attachDocument,
   loadMeetings,
+  livekitToken,
+  livekitWsUrl,
+  livekitRoomName,
+  isLoadingVideo,
+  videoError,
 }: {
   meetings: Meeting[];
   activeUser: User;
@@ -3087,6 +3160,11 @@ function MeetingsView({
   sendMeetingMessage: (meetingId: string) => void;
   attachDocument: (meetingId: string, title: string, fileUrl: string) => void;
   loadMeetings: () => void;
+  livekitToken: string | null;
+  livekitWsUrl: string | null;
+  livekitRoomName: string | null;
+  isLoadingVideo: boolean;
+  videoError: string | null;
 }) {
   const [docTitle, setDocTitle] = useState("");
   const [docUrl, setDocUrl] = useState("");
@@ -3094,6 +3172,8 @@ function MeetingsView({
   const activeMeeting = meetings.find((m) => m.id === activeMeetingId);
   const isHost = activeUser.role === "Manager" && activeMeeting?.hostId === activeUser.id;
   const userParticipant = activeMeeting?.participants.find((p) => p.userId === activeUser.id);
+  const isJoined = userParticipant?.status === "JOINED";
+  const canShowVideo = activeMeeting?.status === "LIVE" && isJoined && livekitToken && livekitWsUrl && livekitRoomName;
 
   if (activeMeetingId && activeMeeting) {
     return (
@@ -3194,6 +3274,40 @@ function MeetingsView({
           {meetingError && (
             <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
               {meetingError}
+            </div>
+          )}
+
+          {videoError && (
+            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <strong>Video unavailable:</strong> {videoError}
+            </div>
+          )}
+
+          {/* Video Room Section */}
+          {canShowVideo && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Video size={16} /> Live Video Room
+              </h3>
+              <div className="rounded-lg overflow-hidden bg-slate-900" style={{ height: "500px" }}>
+                <LiveKitRoom
+                  token={livekitToken}
+                  serverUrl={livekitWsUrl}
+                  connect={true}
+                  video={true}
+                  audio={true}
+                  style={{ height: "100%" }}
+                >
+                  <VideoConference />
+                  <RoomAudioRenderer />
+                </LiveKitRoom>
+              </div>
+            </div>
+          )}
+
+          {isLoadingVideo && (
+            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              Loading video room...
             </div>
           )}
 
