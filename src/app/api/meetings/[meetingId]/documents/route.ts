@@ -15,6 +15,17 @@ const documentSchema = z.object({
 
 type RouteContext = { params: Promise<{ meetingId: string }> };
 
+async function canAccessMeeting(meetingId: string, userId: string, role: string) {
+  const meeting = await prisma.meeting.findFirst({
+    where:
+      role === "ADMIN"
+        ? { id: meetingId }
+        : { id: meetingId, OR: [{ hostId: userId }, { participants: { some: { userId } } }] },
+    select: { id: true },
+  });
+  return Boolean(meeting);
+}
+
 async function canManageMeeting(meetingId: string, userId: string, role: string) {
   const meeting = await prisma.meeting.findFirst({
     where:
@@ -30,6 +41,32 @@ async function canManageMeeting(meetingId: string, userId: string, role: string)
     select: { id: true },
   });
   return Boolean(meeting);
+}
+
+export async function GET(request: Request, context: RouteContext) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  
+  const { meetingId } = await context.params;
+  if (!(await canAccessMeeting(meetingId, sessionUser.id, sessionUser.role))) {
+    return NextResponse.json({ error: "Meeting not found or access denied." }, { status: 404 });
+  }
+
+  const documents = await prisma.meetingDocument.findMany({
+    where: { meetingId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return NextResponse.json({
+    documents: documents.map((doc) => ({
+      id: doc.id,
+      meetingId: doc.meetingId,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      status: doc.status,
+      createdAt: doc.createdAt.toISOString(),
+    })),
+  });
 }
 
 export async function POST(request: Request, context: RouteContext) {

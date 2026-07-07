@@ -1021,11 +1021,19 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, fileUrl }),
       });
-      if (!response.ok) throw new Error("Could not attach document.");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("Document attach failed:", errorData);
+        throw new Error(errorData.error || "Could not attach document.");
+      }
+      
       await loadMeetings();
       setMeetingError("");
     } catch (error) {
-      setMeetingError(error instanceof Error ? error.message : "Failed to attach document.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to attach document.";
+      console.error("Attach document error:", error);
+      setMeetingError(errorMessage);
     }
   };
 
