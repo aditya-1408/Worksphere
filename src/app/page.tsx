@@ -1060,17 +1060,25 @@ export default function Home() {
         loadMeetingMessages(activeMeetingId);
       }, 3000);
       
-      // Also poll meeting status to detect if it ended
+      // Check meeting status separately (lightweight, doesn't reload full meetings)
       const statusInterval = setInterval(async () => {
-        await loadMeetings();
-        
-        // Check if current meeting ended
-        const currentMeeting = meetings.find(m => m.id === activeMeetingId);
-        if (currentMeeting && (currentMeeting.status === "ENDED" || currentMeeting.status === "CANCELLED")) {
-          // Meeting ended - clear video
-          setLivekitToken(null);
-          setLivekitWsUrl(null);
-          setLivekitRoomName(null);
+        try {
+          const response = await fetch(`/api/meetings/${activeMeetingId}/status`, {
+            cache: "no-store"
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Only reload if status changed to ENDED or CANCELLED
+            if (data.meeting?.status === "ENDED" || data.meeting?.status === "CANCELLED") {
+              await loadMeetings();
+              // Clear video
+              setLivekitToken(null);
+              setLivekitWsUrl(null);
+              setLivekitRoomName(null);
+            }
+          }
+        } catch (error) {
+          console.error("Status check failed:", error);
         }
       }, 5000); // Check every 5 seconds
       

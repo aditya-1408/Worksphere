@@ -8,6 +8,38 @@ export const runtime = "nodejs";
 const statusSchema = z.object({ action: z.enum(["start", "join", "leave", "end", "cancel"]) });
 type RouteContext = { params: Promise<{ meetingId: string }> };
 
+export async function GET(request: Request, context: RouteContext) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  
+  const { meetingId } = await context.params;
+  
+  const meeting = await prisma.meeting.findFirst({
+    where:
+      sessionUser.role === "ADMIN"
+        ? { id: meetingId }
+        : { id: meetingId, OR: [{ hostId: sessionUser.id }, { participants: { some: { userId: sessionUser.id } } }] },
+    select: { 
+      id: true, 
+      status: true, 
+      startedAt: true, 
+      endedAt: true,
+      participants: {
+        select: {
+          userId: true,
+          status: true,
+          joinedAt: true,
+          leftAt: true,
+        }
+      }
+    },
+  });
+  
+  if (!meeting) return NextResponse.json({ error: "Meeting not found or access denied." }, { status: 404 });
+  
+  return NextResponse.json({ meeting });
+}
+
 export async function POST(request: Request, context: RouteContext) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
