@@ -28,14 +28,24 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useTracks } from "@livekit/components-react";
+import { Track } from "livekit-client";
 
 // Dynamically import LiveKit components (client-side only)
 const LiveKitRoom = dynamic(
   () => import("@livekit/components-react").then((mod) => mod.LiveKitRoom),
   { ssr: false }
 );
-const VideoConference = dynamic(
-  () => import("@livekit/components-react").then((mod) => mod.VideoConference),
+const GridLayout = dynamic(
+  () => import("@livekit/components-react").then((mod) => mod.GridLayout),
+  { ssr: false }
+);
+const ParticipantTile = dynamic(
+  () => import("@livekit/components-react").then((mod) => mod.ParticipantTile),
+  { ssr: false }
+);
+const ControlBar = dynamic(
+  () => import("@livekit/components-react").then((mod) => mod.ControlBar),
   { ssr: false }
 );
 const RoomAudioRenderer = dynamic(
@@ -3154,6 +3164,28 @@ function ConfirmationDialog({
   );
 }
 
+// Custom video grid component that shows all participants in a grid
+function MyVideoGrid() {
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false }
+  );
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <GridLayout tracks={tracks} style={{ flex: 1 }}>
+        <ParticipantTile />
+      </GridLayout>
+      <div style={{ padding: "8px", display: "flex", justifyContent: "center" }}>
+        <ControlBar />
+      </div>
+    </div>
+  );
+}
+
 function MeetingsView({
   meetings,
   activeUser,
@@ -3380,10 +3412,7 @@ function MeetingsView({
                     dynacast: true,
                   }}
                 >
-                  <VideoConference 
-                    chatMessageFormatter={(message) => message}
-                    SettingsComponent={undefined}
-                  />
+                  <MyVideoGrid />
                   <RoomAudioRenderer />
                 </LiveKitRoom>
               </div>
