@@ -53,6 +53,32 @@ enum Quarter {
   Q4
 }
 
+enum MeetingStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+enum MeetingParticipantStatus {
+  INVITED
+  JOINED
+  LEFT
+  DECLINED
+}
+
+enum MeetingDocumentStatus {
+  ATTACHED
+  INDEXED
+  FAILED
+}
+
+enum MeetingSummaryStatus {
+  PENDING
+  GENERATED
+  FAILED
+}
+
 model User {
   id                 String           @id @default(cuid())
   name               String
@@ -68,6 +94,10 @@ model User {
   ownedSharedGoals   SharedGoal[]     @relation("SharedGoalOwner")
   checkInsAsEmployee CheckIn[]        @relation("EmployeeCheckIns")
   checkInsAsManager  CheckIn[]        @relation("ManagerCheckIns")
+  hostedMeetings      Meeting[]        @relation("MeetingHost")
+  meetingParticipants MeetingParticipant[]
+  meetingMessages     MeetingMessage[]
+  assignedActionItems MeetingActionItem[] @relation("MeetingActionAssignee")
   auditLogs          AuditLog[]       @relation("AuditActor")
   escalations        EscalationLog[]
   createdAt          DateTime         @default(now())
@@ -89,6 +119,7 @@ model Cycle {
   submissions         GoalSubmission[]
   sharedGoals         SharedGoal[]
   checkIns            CheckIn[]
+  meetings            Meeting[]
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 }
@@ -201,4 +232,136 @@ model EscalationLog {
   user       User      @relation(fields: [userId], references: [id])
   createdAt  DateTime  @default(now())
   resolvedAt DateTime?
+}
+
+model Meeting {
+  id               String               @id @default(cuid())
+  title            String
+  agenda           String?
+  department       String
+  hostId           String
+  cycleId          String?
+  status           MeetingStatus        @default(SCHEDULED)
+  scheduledAt      DateTime
+  startedAt        DateTime?
+  endedAt          DateTime?
+  livekitRoomName  String?              @unique
+  recordingUrl     String?
+  transcriptStatus MeetingSummaryStatus @default(PENDING)
+  summaryStatus    MeetingSummaryStatus @default(PENDING)
+  host             User                 @relation("MeetingHost", fields: [hostId], references: [id])
+  cycle            Cycle?               @relation(fields: [cycleId], references: [id])
+  participants     MeetingParticipant[]
+  messages         MeetingMessage[]
+  documents        MeetingDocument[]
+  transcripts      MeetingTranscriptSegment[]
+  summaries        MeetingSummary[]
+  actionItems      MeetingActionItem[]
+  knowledgeChunks  MeetingKnowledgeChunk[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([hostId, status])
+  @@index([department, scheduledAt])
+}
+
+model MeetingParticipant {
+  id        String                   @id @default(cuid())
+  meetingId String
+  userId    String
+  status    MeetingParticipantStatus @default(INVITED)
+  joinedAt  DateTime?
+  leftAt    DateTime?
+  meeting   Meeting                  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user      User                     @relation(fields: [userId], references: [id])
+
+  @@unique([meetingId, userId])
+  @@index([userId, status])
+}
+
+model MeetingMessage {
+  id        String   @id @default(cuid())
+  meetingId String
+  senderId  String
+  body      String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([meetingId, createdAt])
+}
+
+model MeetingDocument {
+  id          String                @id @default(cuid())
+  meetingId   String
+  title       String
+  fileName    String?
+  fileUrl     String
+  mimeType    String?
+  textContent String?
+  status      MeetingDocumentStatus @default(ATTACHED)
+  meeting     Meeting               @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime              @default(now())
+
+  @@index([meetingId, status])
+}
+
+model MeetingTranscriptSegment {
+  id          String   @id @default(cuid())
+  meetingId   String
+  speakerName String?
+  startSecond Int?
+  endSecond   Int?
+  text        String
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([meetingId, createdAt])
+}
+
+model MeetingSummary {
+  id               String               @id @default(cuid())
+  meetingId        String
+  status           MeetingSummaryStatus @default(GENERATED)
+  summary          String
+  discussionPoints Json
+  decisions        Json
+  blockers         Json
+  sentiment        String
+  followUps        Json
+  model            String
+  meeting          Meeting              @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdAt        DateTime             @default(now())
+}
+
+model MeetingActionItem {
+  id          String    @id @default(cuid())
+  meetingId   String
+  assigneeId  String?
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String    @default("OPEN")
+  meeting     Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  assignee    User?     @relation("MeetingActionAssignee", fields: [assigneeId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([meetingId, status])
+  @@index([assigneeId, status])
+}
+
+model MeetingKnowledgeChunk {
+  id             String   @id @default(cuid())
+  meetingId      String
+  sourceType     String
+  sourceId       String?
+  content        String
+  embedding      Json?
+  embeddingModel String?
+  metadata       Json?
+  meeting        Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([meetingId, sourceType])
 }
